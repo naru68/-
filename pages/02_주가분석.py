@@ -3,7 +3,7 @@ import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
 
-# KOSPI100 일부 종목 (필요하면 전체 넣어줄게)
+# KOSPI100 일부
 kospi100 = {
     "삼성전자": "005930.KS",
     "SK하이닉스": "000660.KS",
@@ -15,10 +15,7 @@ kospi100 = {
     "POSCO홀딩스": "005490.KS"
 }
 
-# UI
 st.title("📈 KOSPI 100 주가 비교 웹앱 (Plotly 버전)")
-st.write("KOSPI 100 종목 중 2개를 선택해서 주가 및 수익률을 비교해보세요.")
-
 stock1_name = st.selectbox("📌 첫 번째 종목", list(kospi100.keys()))
 stock2_name = st.selectbox("📌 두 번째 종목", list(kospi100.keys()), index=1)
 period = st.selectbox("📅 조회 기간", ["1mo", "3mo", "6mo", "1y", "2y", "5y"], index=3)
@@ -27,41 +24,37 @@ ticker1 = kospi100[stock1_name]
 ticker2 = kospi100[stock2_name]
 
 # 데이터 가져오기
-data = yf.download([ticker1, ticker2], period=period)["Adj Close"]
-data.dropna(inplace=True)
-returns = data / data.iloc[0] * 100  # 누적 수익률
+raw_data = yf.download([ticker1, ticker2], period=period)
 
-# --- Plotly 그래프 ---
+# "Adj Close"만 추출 (다중 종목 대응)
+try:
+    data = raw_data["Adj Close"]
+except KeyError:
+    data = raw_data.xs("Adj Close", level=1, axis=1)
+
+# 결측치 제거 후 수익률 계산
+data.dropna(inplace=True)
+returns = data / data.iloc[0] * 100
+
+# Plotly 그래프
 fig = go.Figure()
 
-fig.add_trace(go.Scatter(
-    x=returns.index,
-    y=returns[ticker1],
-    mode='lines',
-    name=stock1_name,
-    line=dict(color='blue')
-))
-
-fig.add_trace(go.Scatter(
-    x=returns.index,
-    y=returns[ticker2],
-    mode='lines',
-    name=stock2_name,
-    line=dict(color='red')
-))
+fig.add_trace(go.Scatter(x=returns.index, y=returns[ticker1],
+                         mode='lines', name=stock1_name, line=dict(color='blue')))
+fig.add_trace(go.Scatter(x=returns.index, y=returns[ticker2],
+                         mode='lines', name=stock2_name, line=dict(color='red')))
 
 fig.update_layout(
     title="📊 누적 수익률 비교 (기준일 대비 %)",
     xaxis_title="날짜",
     yaxis_title="수익률 (%)",
-    legend=dict(x=0, y=1),
     template="plotly_white",
     hovermode="x unified"
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
-# --- 기업 정보 ---
+# 주요 지표
 st.subheader("📌 주요 지표 비교")
 
 def get_info(ticker):
@@ -89,4 +82,4 @@ with col2:
     for k, v in info2.items():
         st.write(f"**{k}:** {v}")
 
-st.caption("📉 데이터 출처: Yahoo Finance (실시간이 아닐 수 있음)")
+st.caption("📉 데이터 출처: Yahoo Finance")
