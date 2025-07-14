@@ -15,7 +15,7 @@ kospi100 = {
     "POSCO홀딩스": "005490.KS"
 }
 
-st.title("📈 KOSPI 100 주가 비교 웹앱 (Plotly 버전)")
+st.title("📈 KOSPI 100 주가 비교 웹앱 (Plotly 안정화 버전)")
 stock1_name = st.selectbox("📌 첫 번째 종목", list(kospi100.keys()))
 stock2_name = st.selectbox("📌 두 번째 종목", list(kospi100.keys()), index=1)
 period = st.selectbox("📅 조회 기간", ["1mo", "3mo", "6mo", "1y", "2y", "5y"], index=3)
@@ -23,26 +23,36 @@ period = st.selectbox("📅 조회 기간", ["1mo", "3mo", "6mo", "1y", "2y", "5
 ticker1 = kospi100[stock1_name]
 ticker2 = kospi100[stock2_name]
 
-# 데이터 가져오기
-raw_data = yf.download([ticker1, ticker2], period=period)
+# 데이터 다운로드
+tickers = [ticker1, ticker2]
+raw_data = yf.download(tickers, period=period)
 
-# "Adj Close"만 추출 (다중 종목 대응)
-try:
-    data = raw_data["Adj Close"]
-except KeyError:
-    data = raw_data.xs("Adj Close", level=1, axis=1)
+# 데이터 구조에 따라 'Adj Close' 안전하게 추출
+if isinstance(raw_data.columns, pd.MultiIndex):
+    # 멀티인덱스: (속성, 티커) 구조이므로 이렇게 추출
+    data = raw_data['Adj Close']
+else:
+    # 단일 컬럼: 데이터가 하나만 들어온 경우
+    data = raw_data[['Adj Close']]
+    data.columns = [tickers[0]]  # 단일 종목일 때는 이름 바꿔줌
 
-# 결측치 제거 후 수익률 계산
+# 결측치 제거
 data.dropna(inplace=True)
+
+# 수익률 계산 (기준일 대비 %)
 returns = data / data.iloc[0] * 100
 
 # Plotly 그래프
 fig = go.Figure()
-
-fig.add_trace(go.Scatter(x=returns.index, y=returns[ticker1],
-                         mode='lines', name=stock1_name, line=dict(color='blue')))
-fig.add_trace(go.Scatter(x=returns.index, y=returns[ticker2],
-                         mode='lines', name=stock2_name, line=dict(color='red')))
+for ticker, name, color in zip([ticker1, ticker2], [stock1_name, stock2_name], ['blue', 'red']):
+    if ticker in returns.columns:
+        fig.add_trace(go.Scatter(
+            x=returns.index,
+            y=returns[ticker],
+            mode='lines',
+            name=name,
+            line=dict(color=color)
+        ))
 
 fig.update_layout(
     title="📊 누적 수익률 비교 (기준일 대비 %)",
@@ -51,21 +61,29 @@ fig.update_layout(
     template="plotly_white",
     hovermode="x unified"
 )
-
 st.plotly_chart(fig, use_container_width=True)
 
-# 주요 지표
+# 기업 정보 비교
 st.subheader("📌 주요 지표 비교")
 
 def get_info(ticker):
-    info = yf.Ticker(ticker).info
-    return {
-        "시가총액": f"{info.get('marketCap', 'N/A'):,}",
-        "PER": info.get('trailingPE', 'N/A'),
-        "PBR": info.get('priceToBook', 'N/A'),
-        "배당수익률": info.get('dividendYield', 'N/A'),
-        "산업": info.get('industry', 'N/A')
-    }
+    try:
+        info = yf.Ticker(ticker).info
+        return {
+            "시가총액": f"{info.get('marketCap', 'N/A'):,}",
+            "PER": info.get('trailingPE', 'N/A'),
+            "PBR": info.get('priceToBook', 'N/A'),
+            "배당수익률": info.get('dividendYield', 'N/A'),
+            "산업": info.get('industry', 'N/A')
+        }
+    except Exception:
+        return {
+            "시가총액": "N/A",
+            "PER": "N/A",
+            "PBR": "N/A",
+            "배당수익률": "N/A",
+            "산업": "N/A"
+        }
 
 info1 = get_info(ticker1)
 info2 = get_info(ticker2)
