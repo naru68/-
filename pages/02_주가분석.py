@@ -1,26 +1,13 @@
-# 데이터 다운로드
-tickers = [ticker1, ticker2]
-raw_data = yf.download(tickers, period=period)
+# 종목 선택
+stock1_name = st.selectbox("첫 번째 종목", list(kospi100.keys()))
+stock2_name = st.selectbox("두 번째 종목", list(kospi100.keys()), index=1)
 
-# 멀티인덱스 여부 체크
-if isinstance(raw_data.columns, pd.MultiIndex):
-    if "Adj Close" in raw_data.columns.get_level_values(0):
-        data = raw_data["Adj Close"]
-    elif "Close" in raw_data.columns.get_level_values(0):
-        data = raw_data["Close"]
-        st.warning("⚠️ 'Adj Close'가 없어 'Close' 데이터를 대신 사용합니다.")
-    else:
-        st.error("❗ 'Adj Close'나 'Close' 데이터가 없습니다. 다른 종목을 선택하세요.")
-        st.stop()
-else:
-    # 싱글 티커일 때
-    if "Adj Close" in raw_data.columns:
-        data = raw_data[["Adj Close"]]
-        data.columns = [tickers[0]]
-    elif "Close" in raw_data.columns:
-        data = raw_data[["Close"]]
-        data.columns = [tickers[0]]
-        st.warning("⚠️ 'Adj Close'가 없어 'Close' 데이터를 대신 사용합니다.")
-    else:
-        st.error("❗ 유효한 주가 데이터가 없습니다.")
-        st.stop()
+# 여기서 ticker1, ticker2를 지정해야 함
+ticker1 = kospi100[stock1_name]
+ticker2 = kospi100[stock2_name]
+
+# ✅ 이제 이 시점 이후에 tickers 리스트 생성
+tickers = [ticker1, ticker2]
+
+# 그다음에 다운로드 코드 실행
+raw_data = yf.download(tickers, period=period)
