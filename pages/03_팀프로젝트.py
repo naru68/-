@@ -15,42 +15,39 @@ if uploaded_file:
     st.subheader("📄 원본 데이터 미리보기")
     st.dataframe(df.head(10))
 
-    # 첫 번째 열이 국가 이름, 나머지는 연도로 간주
-    df = df.set_index(df.columns[0])  # 국가명을 인덱스로
-    df = df.transpose()  # 연도-국가 시계열 구조로 변환
+    # 첫 번째 열을 인덱스로 설정 (국가명), 연도별 데이터로 전환
+    df = df.set_index(df.columns[0])
+    df = df.transpose()
 
-    # 열 이름 정리
-    df.index.name = "Year"
-    df.reset_index(inplace=True)
+    # "year"라는 값이 행으로 들어가 있으면 제거
+    df = df[df.index != "year"]
 
-    # 연도 컬럼 처리
+    # 인덱스 → datetime 처리
     try:
+        df.index.name = "Year"
+        df.reset_index(inplace=True)
         df['Year'] = pd.to_datetime(df['Year'], format='%Y')
+        df.set_index('Year', inplace=True)
     except Exception as e:
         st.error(f"'Year' 열을 날짜로 변환할 수 없습니다: {e}")
         st.stop()
 
-    df.set_index('Year', inplace=True)
-
-    # 숫자형 컬럼(국가) 목록
+    # 숫자형 국가만 필터링
     countries = [col for col in df.columns if df[col].dtype in ['float64', 'int64']]
     if not countries:
-        st.error("숫자형 국가 데이터가 없습니다.")
+        st.error("예측 가능한 숫자형 국가 데이터가 없습니다.")
         st.stop()
 
-    # 국가 선택
     selected_country = st.selectbox("국가 또는 지역을 선택하세요", countries)
 
-    # 시계열 추출
     ts = df[selected_country].dropna()
 
     if len(ts) < 15:
-        st.warning("⚠️ 예측하기에 데이터가 너무 적습니다 (15개 이상 필요).")
+        st.warning("⚠️ 예측하기에 데이터가 너무 적습니다. 최소 15개 이상 필요합니다.")
         st.stop()
 
     st.subheader(f"📈 {selected_country}의 전력 소비 예측 (10년)")
 
-    # ARIMA 모델 훈련 및 예측
     try:
         model = ARIMA(ts, order=(1, 1, 1))
         model_fit = model.fit()
@@ -72,5 +69,6 @@ if uploaded_file:
 
     except Exception as e:
         st.error(f"모델 학습 오류: {e}")
+
 else:
     st.info("CSV 파일을 업로드하면 예측을 시작할 수 있습니다.")
