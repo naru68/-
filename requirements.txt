@@ -1,6 +1,4 @@
 streamlit
-yfinance
-plotly
 pandas
-matplotlib 
-pmdarima
+matplotlib
+statsmodels
